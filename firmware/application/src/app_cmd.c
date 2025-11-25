@@ -864,7 +864,11 @@ static data_frame_tx_t *cmd_processor_em410x_get_emu_id(uint16_t cmd, uint16_t s
         return data_frame_make(cmd, STATUS_PAR_ERR, 0, data);  // no data in slot, don't send garbage
     }
     tag_data_buffer_t *buffer = get_buffer_by_tag_type(tag_type);
-    return data_frame_make(cmd, STATUS_SUCCESS, id_size, buffer->buffer);
+    uint8_t resp[2 + LF_EM410X_ELECTRA_TAG_ID_SIZE] = {0x00};
+    resp[0] = tag_type >> 8;
+    resp[1] = tag_type;
+    memcpy(resp + 2, buffer->buffer, id_size);
+    return data_frame_make(cmd, STATUS_SUCCESS, 2 + id_size, resp);
 }
 
 static data_frame_tx_t *cmd_processor_hidprox_set_emu_id(uint16_t cmd, uint16_t status, uint16_t length, uint8_t *data) {

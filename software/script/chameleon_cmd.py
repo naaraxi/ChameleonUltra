@@ -631,14 +631,33 @@ class ChameleonCMD:
         """
         resp = self.device.send_cmd_sync(Command.EM410X_GET_EMU_ID)
         if resp.status == Status.SUCCESS:
-            lf_tag_type = self._get_active_lf_tag_type()
-            if lf_tag_type == TagSpecificType.EM410X_ELECTRA:
-                fmt = '!13s'
-            elif lf_tag_type == TagSpecificType.EM410X:
-                fmt = '!5s'
-            else:
-                fmt = f'!{len(resp.data)}s'
-            resp.parsed = struct.unpack(fmt, resp.data[:struct.calcsize(fmt)])[0]
+            data = resp.data
+            id_bytes = data
+            tag_type = None
+
+            if len(data) >= 2:
+                try:
+                    candidate = TagSpecificType(int.from_bytes(data[:2], byteorder='big'))
+                except ValueError:
+                    candidate = None
+
+                if candidate in (TagSpecificType.EM410X, TagSpecificType.EM410X_ELECTRA):
+                    expected_len = 13 if candidate == TagSpecificType.EM410X_ELECTRA else 5
+                    if len(data) == expected_len + 2:
+                        tag_type = candidate
+                        id_bytes = data[2:2 + expected_len]
+
+            if tag_type is None:
+                lf_tag_type = self._get_active_lf_tag_type()
+                if lf_tag_type == TagSpecificType.EM410X_ELECTRA:
+                    expected_len = 13
+                elif lf_tag_type == TagSpecificType.EM410X:
+                    expected_len = 5
+                else:
+                    expected_len = len(data)
+                id_bytes = data[:expected_len]
+
+            resp.parsed = id_bytes
         return resp
 
     @expect_response(Status.SUCCESS)
