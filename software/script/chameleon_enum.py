@@ -258,6 +258,7 @@ class TagSpecificType(enum.IntEnum):
     EM410X_16 = 101
     EM410X_32 = 102
     EM410X_64 = 103
+    EM410X_ELECTRA = 104
     # FDX-B
     # securakey
     # gallagher
@@ -349,6 +350,8 @@ class TagSpecificType(enum.IntEnum):
             return "EM410X/32"
         elif self == TagSpecificType.EM410X_64:
             return "EM410X/64"
+        elif self == TagSpecificType.EM410X_ELECTRA:
+            return "EM410X Electra"
         elif self == TagSpecificType.HIDProx:
             return "HIDProx"
         elif self == TagSpecificType.Viking:
@@ -625,4 +628,3 @@ class HIDFormat(enum.IntEnum):
         if self in descriptions:
             return descriptions[self]
         return "Invalid"
-

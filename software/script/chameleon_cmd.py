@@ -434,7 +434,12 @@ class ChameleonCMD:
         """
         resp = self.device.send_cmd_sync(Command.EM410X_SCAN)
         if resp.status == Status.LF_TAG_OK:
-            resp.parsed = struct.unpack('!h5s', resp.data) # tag type + uid
+            tag_type = struct.unpack('!H', resp.data[:2])[0]
+            if tag_type == TagSpecificType.EM410X_ELECTRA:
+                fmt = '!H13s'
+            else:
+                fmt = '!H5s'
+            resp.parsed = struct.unpack(fmt, resp.data[:struct.calcsize(fmt)]) # tag type + uid
         return resp
 
     @expect_response(Status.LF_TAG_OK)
@@ -591,6 +596,12 @@ class ChameleonCMD:
         data = struct.pack('!BBB', SlotNumber.to_fw(slot_index), sense_type, enabled)
         return self.device.send_cmd_sync(Command.SET_SLOT_ENABLE, data)
 
+    def _get_active_lf_tag_type(self) -> TagSpecificType:
+        slotinfo = self.get_slot_info()
+        active_slot = SlotNumber.from_fw(self.get_active_slot())
+        lf_tag_value = slotinfo[active_slot - 1]['lf']
+        return TagSpecificType(lf_tag_value)
+
     @expect_response(Status.SUCCESS)
     def em410x_set_emu_id(self, id: bytes):
         """
@@ -599,9 +610,18 @@ class ChameleonCMD:
         :param id_bytes: byte of the card number
         :return:
         """
-        if len(id) != 5:
-            raise ValueError("The id bytes length must equal 5")
-        data = struct.pack('5s', id)
+        lf_tag_type = self._get_active_lf_tag_type()
+        if lf_tag_type == TagSpecificType.EM410X_ELECTRA:
+            expected_len = 13
+        elif lf_tag_type == TagSpecificType.EM410X:
+            expected_len = 5
+        else:
+            raise ValueError(f"Active LF slot type {lf_tag_type} is not EM410X")
+
+        if len(id) != expected_len:
+            raise ValueError(f"The id bytes length must equal {expected_len}")
+
+        data = struct.pack(f'!{expected_len}s', id)
         return self.device.send_cmd_sync(Command.EM410X_SET_EMU_ID, data)
 
     @expect_response(Status.SUCCESS)
@@ -610,7 +630,15 @@ class ChameleonCMD:
         Get the emulated EM410x card id
         """
         resp = self.device.send_cmd_sync(Command.EM410X_GET_EMU_ID)
-        resp.parsed = resp.data
+        if resp.status == Status.SUCCESS:
+            lf_tag_type = self._get_active_lf_tag_type()
+            if lf_tag_type == TagSpecificType.EM410X_ELECTRA:
+                fmt = '!13s'
+            elif lf_tag_type == TagSpecificType.EM410X:
+                fmt = '!5s'
+            else:
+                fmt = f'!{len(resp.data)}s'
+            resp.parsed = struct.unpack(fmt, resp.data[:struct.calcsize(fmt)])[0]
         return resp
 
     @expect_response(Status.SUCCESS)

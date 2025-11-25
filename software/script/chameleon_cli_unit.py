@@ -405,8 +405,8 @@ class LFEMIdArgsUnit(DeviceRequiredUnit):
     def before_exec(self, args: argparse.Namespace):
         if not super().before_exec(args):
             return False
-        if args.id is None or not re.match(r"^[a-fA-F0-9]{10}$", args.id):
-            raise ArgsParserError("ID must include 10 HEX symbols")
+        if args.id is None or not re.match(r"^([a-fA-F0-9]{10}|[a-fA-F0-9]{26})$", args.id):
+            raise ArgsParserError("ID must include 10 or 26 HEX symbols")
         return True
 
     def args_parser(self) -> ArgumentParserNoExit:
@@ -3135,7 +3135,7 @@ class LFEMRead(ReaderRequiredUnit):
 
     def on_exec(self, args: argparse.Namespace):
         data = self.cmd.em410x_scan()
-        print(color_string((TagSpecificType(data[0])), (CG, data[1].hex())))
+        print(color_string((CG, str(TagSpecificType(data[0]))), (CY, data[1].hex())))
 
 
 @lf_em_410x.command('write')
@@ -3147,6 +3147,8 @@ class LFEM410xWriteT55xx(LFEMIdArgsUnit, ReaderRequiredUnit):
 
     def on_exec(self, args: argparse.Namespace):
         id_hex = args.id
+        if len(id_hex) != 10:
+            raise ArgsParserError("Writing to T55xx supports 5-byte EM410X IDs (10 hex characters).")
         id_bytes = bytes.fromhex(id_hex)
         self.cmd.em410x_write_to_t55xx(id_bytes)
         print(f" - EM410x ID(10H): {id_hex} write done.")
